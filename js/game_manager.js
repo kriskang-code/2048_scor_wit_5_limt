@@ -3,7 +3,6 @@ function GameManager(size, InputManager, Actuator, StorageManager) {
   this.inputManager   = new InputManager;
   this.storageManager = new StorageManager;
   this.actuator       = new Actuator;
-  this.tileCount = 0;
 
   this.startTiles     = 2;
 
@@ -19,6 +18,7 @@ GameManager.prototype.restart = function () {
   this.storageManager.clearGameState();
   this.actuator.continueGame(); // Clear the game won/lost message
   this.setup();
+  window.location.href = window.location.href;
 };
 
 // Keep playing after winning (allows going over 2048)
@@ -29,23 +29,35 @@ GameManager.prototype.keepPlaying = function () {
 
 // Return true if the game is lost, or has won and the user hasn't kept playing
 GameManager.prototype.isGameTerminated = function () {
-  return this.over || (this.won && !this.keepPlaying);
+  if (this.over || (this.won && !this.keepPlaying)) {
+    return true;
+  } else {
+    return false;
+  }
 };
 
 // Set up the game
-
 GameManager.prototype.setup = function () {
-  this.storageManager.clearGameState();
+  var previousState = this.storageManager.getGameState();
 
-  this.grid = new Grid(this.size);
-  this.score = 0;
-  this.over = false;
-  this.won = false;
-  this.keepPlaying = false;
+  // Reload the game from a previous game if present
+  if (previousState) {
+    this.grid        = new Grid(previousState.grid.size,
+                                previousState.grid.cells); // Reload grid
+    this.score       = previousState.score;
+    this.over        = previousState.over;
+    this.won         = previousState.won;
+    this.keepPlaying = previousState.keepPlaying;
+  } else {
+    this.grid        = new Grid(this.size);
+    this.score       = 0;
+    this.over        = false;
+    this.won         = false;
+    this.keepPlaying = false;
 
-  this.addStartTiles();
-  this.actuate();
-
+    // Add the initial tiles
+    this.addStartTiles();
+  }
 
   // Update the actuator
   this.actuate();
@@ -61,29 +73,7 @@ GameManager.prototype.addStartTiles = function () {
 // Adds a tile in a random position
 GameManager.prototype.addRandomTile = function () {
   if (this.grid.cellsAvailable()) {
-    this.tileCount++;
-
-// Determine phase: every 20 tiles = one full cycle
-    var cyclePosition = this.tileCount % 30;
-
-// High randomness: first 10 tiles of cycle
-    var prob2;
-
-    if (cyclePosition < 10) {
-  // First 10 tiles: always 2
-      prob2 = 0.95;
-    } else if (cyclePosition < 20) {
-  // Next 10 tiles: always 4
-      prob2 = 0.05;
-
-    } else {
-  // Last 10 tiles: random
-    prob2 = 0.5;
-    }
-
-// Decide tile value
-    var value = Math.random() < prob2 ? 2 : 4;
-
+    var value = Math.random() < 0.9 ? 2 : 4;
     var tile = new Tile(this.grid.randomAvailableCell(), value);
 
     this.grid.insertTile(tile);
