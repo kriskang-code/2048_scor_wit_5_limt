@@ -1,12 +1,14 @@
 // js/time_pressure.js
 (function () {
   const MOVE_LIMIT_MS = 5000; // 5 seconds
-  const TICK_MS = 100;        // update frequency for smooth UI
+  const TICK_MS = 100;        // smooth UI updates
 
   let remainingMs = MOVE_LIMIT_MS;
   let timer = null;
   let lastTick = null;
-  let enabled = true;
+
+  let enabled = false;        // <-- do NOT start on page load
+  let started = false;        // <-- start only after first move
   let isForcing = false;
 
   function getRandomDirection() {
@@ -45,6 +47,18 @@
     setUI(remainingMs);
   }
 
+  function startTimerLoop(inputManager) {
+    if (timer) return; // already running
+    timer = setInterval(function () {
+      tick(inputManager);
+    }, TICK_MS);
+  }
+
+  function stopTimerLoop() {
+    if (timer) clearInterval(timer);
+    timer = null;
+  }
+
   function tick(inputManager) {
     if (!enabled) return;
 
@@ -55,7 +69,6 @@
     remainingMs -= dt;
 
     if (remainingMs <= 0) {
-      // Force a RANDOM move via the game's own event system
       isForcing = true;
       inputManager.emit("move", getRandomDirection());
       isForcing = false;
@@ -67,28 +80,39 @@
     setUI(remainingMs);
   }
 
-  // Call this once after you create the game:
+  // Call after creating the game:
   // window.attachTimePressure(game.inputManager)
   window.attachTimePressure = function (inputManager) {
-    // Reset countdown whenever the game receives ANY move (player move or forced move)
-    // If you want reset ONLY on player moves, keep the isForcing check
+    // Show UI, but don't count down yet
+    ensureTimerUI();
+    setUI(MOVE_LIMIT_MS);
+
+    // Start ONLY after the first player move
     inputManager.on("move", function () {
-      if (!isForcing) reset(); // <-- key fix: reset on user move
+      if (isForcing) return;
+
+      if (!started) {
+        started = true;
+        enabled = true;
+        reset();
+        startTimerLoop(inputManager);
+        return;
+      }
+
+      // After any subsequent player move, reset back to 5 seconds
+      reset();
     });
 
+    // On restart: stop and wait again for the first move
     inputManager.on("restart", function () {
-      reset();
+      enabled = false;
+      started = false;
+      stopTimerLoop();
+      setUI(MOVE_LIMIT_MS);
     });
 
     inputManager.on("keepPlaying", function () {
-      reset();
+      // no special handling needed
     });
-
-    reset();
-
-    clearInterval(timer);
-    timer = setInterval(function () {
-      tick(inputManager);
-    }, TICK_MS);
   };
 })();
